@@ -18,7 +18,8 @@ function detect_client_info() {
   CLIENT_ARCH="${SCP_CLIENT_ARCH:-$(uname -m)}"
 
   case "${CLIENT_PLATFORM}" in
-  darwin | linux | windows) ;;
+  darwin | linux) ;;
+  mingw* | msys* | cygwin* | windows*) CLIENT_PLATFORM="windows" ;;
   *) log_error "Unknown or unsupported platform: ${CLIENT_PLATFORM}. Supported platforms are Linux, Darwin, and Windows." 2 ;;
   esac
 
@@ -27,11 +28,19 @@ function detect_client_info() {
   aarch64* | arm64*) CLIENT_ARCH="arm64" ;;
   *) log_error "Unknown or unsupported architecture: ${CLIENT_ARCH}. Supported architectures are x86_64, i686, and arm64." 3 ;;
   esac
+
+  if [[ "${CLIENT_PLATFORM}" == "windows" && "${CLIENT_ARCH}" == "arm64" ]]; then
+    log_error "drone-scp does not currently provide windows-arm64 binaries. Only windows-amd64 is supported." 4
+  fi
 }
 
 detect_client_info
 DOWNLOAD_URL_PREFIX="${DRONE_SCP_RELEASE_URL}/v${DRONE_SCP_VERSION}"
-CLIENT_BINARY="drone-scp-${DRONE_SCP_VERSION}-${CLIENT_PLATFORM}-${CLIENT_ARCH}"
+CLIENT_EXT=""
+if [[ "${CLIENT_PLATFORM}" == "windows" ]]; then
+  CLIENT_EXT=".exe"
+fi
+CLIENT_BINARY="drone-scp-${DRONE_SCP_VERSION}-${CLIENT_PLATFORM}-${CLIENT_ARCH}${CLIENT_EXT}"
 TARGET="${GITHUB_ACTION_PATH}/${CLIENT_BINARY}"
 echo "Downloading ${CLIENT_BINARY} from ${DOWNLOAD_URL_PREFIX}"
 INSECURE_OPTION=""
@@ -39,11 +48,20 @@ if [[ "${INPUT_CURL_INSECURE}" == 'true' ]]; then
   INSECURE_OPTION="--insecure"
 fi
 
-if [[ ! -x "${TARGET}" ]]; then
-  curl -fsSL --retry 5 --keepalive-time 2 ${INSECURE_OPTION} "${DOWNLOAD_URL_PREFIX}/${CLIENT_BINARY}" -o "${TARGET}"
+NEEDS_DOWNLOAD="false"
+if [[ ! -s "${TARGET}" ]]; then
+  NEEDS_DOWNLOAD="true"
+elif [[ "${CLIENT_PLATFORM}" != "windows" && ! -x "${TARGET}" ]]; then
   chmod +x "${TARGET}"
+fi
+
+if [[ "${NEEDS_DOWNLOAD}" == "true" ]]; then
+  curl -fsSL --retry 5 --keepalive-time 2 ${INSECURE_OPTION} "${DOWNLOAD_URL_PREFIX}/${CLIENT_BINARY}" -o "${TARGET}"
+  if [[ "${CLIENT_PLATFORM}" != "windows" ]]; then
+    chmod +x "${TARGET}"
+  fi
 else
-  echo "Binary ${CLIENT_BINARY} already exists and is executable, skipping download."
+  echo "Binary ${CLIENT_BINARY} already exists, skipping download."
 fi
 
 echo "======= CLI Version Information ======="

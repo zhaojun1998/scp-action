@@ -2,8 +2,11 @@ name: lint and test
 on: [push]
 jobs:
   testing:
-    name: test scp action
-    runs-on: ubuntu-latest
+    name: test scp action (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: checkout
         uses: actions/checkout@v5

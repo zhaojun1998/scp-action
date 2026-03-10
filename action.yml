@@ -1,5 +1,5 @@
 name: "SCP Command to Transfer Files"
-description: "Easily transfer files and folders using the SCP command in Linux."
+description: "Easily transfer files and folders using the SCP command on Linux, macOS, and Windows."
 author: "Bo-Yi Wu"
 inputs:
   host:
